@@ -6,7 +6,24 @@ const Expense = require("../Expense");
 
 const createExpense = async (req, res) => {
     try {
-        const expense = await Expense.create(req.body);
+
+        // User ID JWT token se milegi
+        const userId = req.user.id;
+
+        const {
+            amount,
+            description,
+            category,
+            date
+        } = req.body;
+
+        const expense = await Expense.create({
+            userId,
+            amount,
+            description,
+            category,
+            date
+        });
 
         res.status(201).json({
             message: "Expense created successfully",
@@ -14,29 +31,42 @@ const createExpense = async (req, res) => {
         });
 
     } catch (error) {
+
+        console.log(error);
+
         res.status(500).json({
             message: "Failed to create expense",
             error: error.message
         });
+
     }
 };
 
 
 // =========================
-// GET ALL EXPENSES
+// GET USER EXPENSES
 // =========================
 
 const getExpenses = async (req, res) => {
     try {
-        const expenses = await Expense.findAll();
+
+        const userId = req.user.id;
+
+        const expenses = await Expense.findAll({
+            where: {
+                userId
+            }
+        });
 
         res.status(200).json(expenses);
 
     } catch (error) {
+
         res.status(500).json({
             message: "Failed to fetch expenses",
             error: error.message
         });
+
     }
 };
 
@@ -47,15 +77,21 @@ const getExpenses = async (req, res) => {
 
 const deleteExpense = async (req, res) => {
     try {
+
         const { id } = req.params;
 
+        const userId = req.user.id;
+
         const deleted = await Expense.destroy({
-            where: { id }
+            where: {
+                id,
+                userId
+            }
         });
 
         if (!deleted) {
             return res.status(404).json({
-                message: "Expense not found"
+                message: "Expense not found or you are not authorized"
             });
         }
 
@@ -64,10 +100,12 @@ const deleteExpense = async (req, res) => {
         });
 
     } catch (error) {
+
         res.status(500).json({
             message: "Failed to delete expense",
             error: error.message
         });
+
     }
 };
 
@@ -78,22 +116,33 @@ const deleteExpense = async (req, res) => {
 
 const updateExpense = async (req, res) => {
     try {
+
         const { id } = req.params;
+
+        const userId = req.user.id;
 
         const [updated] = await Expense.update(
             req.body,
             {
-                where: { id }
+                where: {
+                    id,
+                    userId
+                }
             }
         );
 
         if (!updated) {
             return res.status(404).json({
-                message: "Expense not found"
+                message: "Expense not found or you are not authorized"
             });
         }
 
-        const expense = await Expense.findByPk(id);
+        const expense = await Expense.findOne({
+            where: {
+                id,
+                userId
+            }
+        });
 
         res.status(200).json({
             message: "Expense updated successfully",
@@ -101,10 +150,12 @@ const updateExpense = async (req, res) => {
         });
 
     } catch (error) {
+
         res.status(500).json({
             message: "Failed to update expense",
             error: error.message
         });
+
     }
 };
 

@@ -7,23 +7,53 @@ const {
     updateExpense
 } = require("../controllers/expenseController");
 
+const authenticateToken = require("../authMiddleware");
+
 const router = express.Router();
 
 
-// Create Expense
-router.post("/", createExpense);
+// =========================
+// CREATE EXPENSE
+// =========================
+
+router.post(
+    "/",
+    authenticateToken,
+    createExpense
+);
 
 
-// Get All Expenses
-router.get("/", getExpenses);
+// =========================
+// GET USER EXPENSES
+// =========================
+
+router.get(
+    "/",
+    authenticateToken,
+    getExpenses
+);
 
 
-// Delete Expense
-router.delete("/:id", deleteExpense);
+// =========================
+// DELETE EXPENSE
+// =========================
+
+router.delete(
+    "/:id",
+    authenticateToken,
+    deleteExpense
+);
 
 
-// Update Expense
-router.put("/:id", updateExpense);
+// =========================
+// UPDATE EXPENSE
+// =========================
+
+router.put(
+    "/:id",
+    authenticateToken,
+    updateExpense
+);
 
 
 module.exports = router;

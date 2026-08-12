@@ -2,10 +2,16 @@ const { DataTypes } = require("sequelize");
 const sequelize = require("./db");
 
 const Expense = sequelize.define("Expense", {
+
     id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true
+    },
+
+    userId: {
+        type: DataTypes.INTEGER,
+        allowNull: false
     },
 
     amount: {
@@ -27,6 +33,7 @@ const Expense = sequelize.define("Expense", {
         type: DataTypes.DATEONLY,
         allowNull: false
     }
+
 });
 
 module.exports = Expense;
