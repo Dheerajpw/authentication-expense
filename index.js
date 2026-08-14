@@ -10,6 +10,8 @@ const Order = require("./Order");
 
 const expenseRoute = require("./routes/expenseRoute");
 const paymentRoute = require("./routes/paymentRoute");
+const premiumRoute = require("./routes/premiumRoute");
+const leaderboardRoute = require("./routes/leaderboardRoute");
 
 const app = express();
 
@@ -38,12 +40,32 @@ app.use(
 
 
 // =========================
+// PREMIUM ROUTES
+// =========================
+
+app.use(
+    "/premium",
+    premiumRoute
+);
+
+
+// =========================
 // PAYMENT ROUTES
 // =========================
 
 app.use(
     "/payment",
     paymentRoute
+);
+
+
+// =========================
+// LEADERBOARD ROUTES
+// =========================
+
+app.use(
+    "/leaderboard",
+    leaderboardRoute
 );
 
 
