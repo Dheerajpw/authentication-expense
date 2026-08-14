@@ -1,25 +1,50 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 
 const sequelize = require("./db");
+
 const Expense = require("./Expense");
+const Order = require("./Order");
+
 const expenseRoute = require("./routes/expenseRoute");
+const paymentRoute = require("./routes/paymentRoute");
 
 const app = express();
+
 
 // =========================
 // MIDDLEWARE
 // =========================
 
 app.use(cors());
+
 app.use(express.json());
+
+app.use(express.urlencoded({
+    extended: true
+}));
 
 
 // =========================
 // EXPENSE ROUTES
 // =========================
 
-app.use("/expenses", expenseRoute);
+app.use(
+    "/expenses",
+    expenseRoute
+);
+
+
+// =========================
+// PAYMENT ROUTES
+// =========================
+
+app.use(
+    "/payment",
+    paymentRoute
+);
 
 
 // =========================
@@ -43,7 +68,7 @@ async function startServer() {
 
     try {
 
-        // Test database connection
+        // Database connection
         await sequelize.authenticate();
 
         console.log(
@@ -51,14 +76,13 @@ async function startServer() {
         );
 
 
-        // Update existing table structure
-        // This will add userId column if required
+        // Sync database tables
         await sequelize.sync({
             alter: true
         });
 
         console.log(
-            "Expense table updated successfully"
+            "Database tables updated successfully"
         );
 
 
