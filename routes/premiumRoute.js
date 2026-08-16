@@ -9,16 +9,10 @@ const authenticateToken =
 
 const router = express.Router();
 
-
-// =========================
-// SHOW LEADERBOARD
-// =========================
-
 router.get(
     "/showleaderboard",
     authenticateToken,
     showLeaderboard
 );
-
 
 module.exports = router;

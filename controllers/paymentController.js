@@ -2,40 +2,62 @@ const axios = require("axios");
 const Order = require("../Order");
 const sequelize = require("../db");
 
+
 // =========================
 // CREATE ORDER
 // =========================
 
 const createOrder = async (req, res) => {
+
     try {
 
         const userId = req.user.id;
+
+        // Premium price
         const amount = 100;
 
         const orderId =
             "ORDER_" + userId + "_" + Date.now();
 
+
+        // =========================
+        // CREATE CASHFREE ORDER
+        // =========================
+
         const response = await axios.post(
+
             "https://sandbox.cashfree.com/pg/orders",
 
             {
                 order_id: orderId,
+
                 order_amount: amount,
+
                 order_currency: "INR",
 
                 customer_details: {
-                    customer_id: String(userId),
-                    customer_phone: "9999999999"
+
+                    customer_id:
+                        String(userId),
+
+                    customer_phone:
+                        "9999999999"
+
                 },
 
                 order_meta: {
+
                     return_url:
-                        "http://127.0.0.1:5502/expense%20tracker/index.html?order_id={order_id}"
+                        "http://127.0.0.1:5503/expense%20tracker/index.html?order_id={order_id}"
+
                 }
+
             },
 
             {
+
                 headers: {
+
                     "x-client-id":
                         process.env.CASHFREE_APP_ID,
 
@@ -50,39 +72,81 @@ const createOrder = async (req, res) => {
 
                     "Accept":
                         "application/json"
+
                 }
+
             }
+
         );
 
-        // Save order in database
+
+        // =========================
+        // SAVE ORDER
+        // =========================
+
         await Order.create({
-            orderId: orderId,
-            userId: userId,
-            amount: amount,
-            status: "PENDING"
+
+            orderId:
+                orderId,
+
+            userId:
+                userId,
+
+            amount:
+                amount,
+
+            status:
+                "PENDING"
+
         });
 
-        res.status(201).json({
-            message: "Order created successfully",
-            orderId: orderId,
+
+        // =========================
+        // SEND RESPONSE
+        // =========================
+
+        return res.status(201).json({
+
+            success:
+                true,
+
+            message:
+                "Order created successfully",
+
+            orderId:
+                orderId,
+
             paymentSessionId:
                 response.data.payment_session_id
+
         });
+
 
     } catch (error) {
 
         console.log(
             "Cashfree error:",
-            error.response?.data || error.message
+            error.response?.data ||
+            error.message
         );
 
-        res.status(500).json({
-            message: "Failed to create order",
+
+        return res.status(500).json({
+
+            success:
+                false,
+
+            message:
+                "Failed to create order",
+
             error:
                 error.response?.data ||
                 error.message
+
         });
+
     }
+
 };
 
 
@@ -94,57 +158,79 @@ const verifyPayment = async (req, res) => {
 
     try {
 
-        const userId = req.user.id;
-        const orderId = req.params.orderId;
+        const userId =
+            req.user.id;
+
+        const orderId =
+            req.params.orderId;
 
 
         // =========================
         // FIND ORDER
         // =========================
 
-        const order = await Order.findOne({
-            where: {
-                orderId: orderId,
-                userId: userId
-            }
-        });
+        const order =
+            await Order.findOne({
+
+                where: {
+
+                    orderId:
+                        orderId,
+
+                    userId:
+                        userId
+
+                }
+
+            });
 
 
         if (!order) {
 
             return res.status(404).json({
-                message: "Order not found"
+
+                message:
+                    "Order not found"
+
             });
 
         }
 
 
         // =========================
-        // GET PAYMENT FROM CASHFREE
+        // GET CASHFREE PAYMENTS
         // =========================
 
-        const response = await axios.get(
-            `https://sandbox.cashfree.com/pg/orders/${orderId}/payments`,
+        const response =
+            await axios.get(
 
-            {
-                headers: {
-                    "x-client-id":
-                        process.env.CASHFREE_APP_ID,
+                `https://sandbox.cashfree.com/pg/orders/${orderId}/payments`,
 
-                    "x-client-secret":
-                        process.env.CASHFREE_SECRET_KEY,
+                {
 
-                    "x-api-version":
-                        "2025-01-01",
+                    headers: {
 
-                    "Accept":
-                        "application/json"
+                        "x-client-id":
+                            process.env.CASHFREE_APP_ID,
+
+                        "x-client-secret":
+                            process.env.CASHFREE_SECRET_KEY,
+
+                        "x-api-version":
+                            "2025-01-01",
+
+                        "Accept":
+                            "application/json"
+
+                    }
+
                 }
-            }
-        );
+
+            );
 
 
-        const payments = response.data;
+        const payments =
+            response.data;
 
 
         console.log(
@@ -154,119 +240,139 @@ const verifyPayment = async (req, res) => {
 
 
         // =========================
-        // PAYMENT FOUND
+        // SUCCESS
         // =========================
 
         if (
             Array.isArray(payments) &&
-            payments.length > 0
+            payments.some(
+                payment =>
+                    payment.payment_status === "SUCCESS"
+            )
         ) {
 
-            const payment = payments[0];
+            // Update order
 
-            const paymentStatus =
-                payment.payment_status;
+            await Order.update(
 
-
-            // =========================
-            // SUCCESSFUL PAYMENT
-            // =========================
-
-            if (paymentStatus === "SUCCESS") {
-
-
-                // Update ORDER
-                await Order.update(
-                    {
-                        status: "SUCCESSFUL"
-                    },
-
-                    {
-                        where: {
-                            orderId: orderId,
-                            userId: userId
-                        }
-                    }
-                );
-
-
-                // =========================
-                // MAKE USER PREMIUM
-                // =========================
-
-                await sequelize.query(
-                    `
-                    UPDATE users
-                    SET isPremium = 1
-                    WHERE id = ?
-                    `,
-                    {
-                        replacements: [userId]
-                    }
-                );
-
-
-                console.log(
-                    "User became premium:",
-                    userId
-                );
-
-
-                return res.status(200).json({
-
-                    message:
-                        "Transaction successful",
-
+                {
                     status:
-                        "SUCCESSFUL",
+                        "SUCCESSFUL"
+                },
 
-                    orderId:
-                        orderId,
+                {
+                    where: {
 
-                    isPremium:
-                        true
-                });
+                        orderId:
+                            orderId,
 
-            }
+                        userId:
+                            userId
 
-
-            // =========================
-            // FAILED PAYMENT
-            // =========================
-
-            if (
-                paymentStatus === "FAILED" ||
-                paymentStatus === "USER_DROPPED"
-            ) {
-
-
-                await Order.update(
-                    {
-                        status: "FAILED"
-                    },
-
-                    {
-                        where: {
-                            orderId: orderId,
-                            userId: userId
-                        }
                     }
-                );
+
+                }
+
+            );
 
 
-                return res.status(200).json({
+            // Make user premium
 
-                    message:
-                        "TRANSACTION FAILED.",
+            await sequelize.query(
 
+                `
+                UPDATE users
+                SET isPremium = 1
+                WHERE id = ?
+                `,
+
+                {
+                    replacements:
+                        [userId]
+                }
+
+            );
+
+
+            console.log(
+                "User became premium:",
+                userId
+            );
+
+
+            return res.status(200).json({
+
+                success:
+                    true,
+
+                message:
+                    "Transaction successful",
+
+                status:
+                    "SUCCESSFUL",
+
+                orderId:
+                    orderId,
+
+                isPremium:
+                    true
+
+            });
+
+        }
+
+
+        // =========================
+        // FAILED
+        // =========================
+
+        if (
+            Array.isArray(payments) &&
+            payments.some(
+                payment =>
+                    payment.payment_status === "FAILED" ||
+                    payment.payment_status === "USER_DROPPED"
+            )
+        ) {
+
+            await Order.update(
+
+                {
                     status:
-                        "FAILED",
+                        "FAILED"
+                },
 
-                    orderId:
-                        orderId
-                });
+                {
+                    where: {
 
-            }
+                        orderId:
+                            orderId,
+
+                        userId:
+                            userId
+
+                    }
+
+                }
+
+            );
+
+
+            return res.status(200).json({
+
+                success:
+                    false,
+
+                message:
+                    "Transaction failed",
+
+                status:
+                    "FAILED",
+
+                orderId:
+                    orderId
+
+            });
 
         }
 
@@ -277,6 +383,9 @@ const verifyPayment = async (req, res) => {
 
         return res.status(200).json({
 
+            success:
+                false,
+
             message:
                 "Payment is still pending",
 
@@ -285,6 +394,7 @@ const verifyPayment = async (req, res) => {
 
             orderId:
                 orderId
+
         });
 
 
@@ -297,7 +407,10 @@ const verifyPayment = async (req, res) => {
         );
 
 
-        res.status(500).json({
+        return res.status(500).json({
+
+            success:
+                false,
 
             message:
                 "Failed to verify payment",
@@ -305,9 +418,11 @@ const verifyPayment = async (req, res) => {
             error:
                 error.response?.data ||
                 error.message
+
         });
 
     }
+
 };
 
 
@@ -316,6 +431,9 @@ const verifyPayment = async (req, res) => {
 // =========================
 
 module.exports = {
+
     createOrder,
+
     verifyPayment
+
 };

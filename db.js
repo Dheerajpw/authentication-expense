@@ -1,12 +1,13 @@
 const { Sequelize } = require("sequelize");
 
 const sequelize = new Sequelize(
-    "expense_db",
+    "expense_tracker",
     "root",
     "Dheeraj@123",
     {
         host: "localhost",
-        dialect: "mysql"
+        dialect: "mysql",
+        logging: false
     }
 );
 

@@ -5,13 +5,49 @@ const cors = require("cors");
 
 const sequelize = require("./db");
 
+const User = require("./User");
 const Expense = require("./Expense");
-const Order = require("./Order");
+require("./Order");
 
-const expenseRoute = require("./routes/expenseRoute");
-const paymentRoute = require("./routes/paymentRoute");
-const premiumRoute = require("./routes/premiumRoute");
-const leaderboardRoute = require("./routes/leaderboardRoute");
+
+// =========================
+// ASSOCIATIONS
+// =========================
+
+// One User can have many Expenses
+User.hasMany(Expense, {
+    foreignKey: "userId",
+    as: "Expenses"
+});
+
+
+// One Expense belongs to one User
+Expense.belongsTo(User, {
+    foreignKey: "userId",
+    as: "User"
+});
+
+
+// =========================
+// ROUTES
+// =========================
+
+const expenseRoute =
+    require("./routes/expenseRoute");
+
+const paymentRoute =
+    require("./routes/paymentRoute");
+
+const premiumRoute =
+    require("./routes/premiumRoute");
+
+const leaderboardRoute =
+    require("./routes/leaderboardRoute");
+
+
+// =========================
+// APP
+// =========================
 
 const app = express();
 
@@ -24,13 +60,15 @@ app.use(cors());
 
 app.use(express.json());
 
-app.use(express.urlencoded({
-    extended: true
-}));
+app.use(
+    express.urlencoded({
+        extended: true
+    })
+);
 
 
 // =========================
-// EXPENSE ROUTES
+// EXPENSE ROUTE
 // =========================
 
 app.use(
@@ -40,17 +78,7 @@ app.use(
 
 
 // =========================
-// PREMIUM ROUTES
-// =========================
-
-app.use(
-    "/premium",
-    premiumRoute
-);
-
-
-// =========================
-// PAYMENT ROUTES
+// PAYMENT ROUTE
 // =========================
 
 app.use(
@@ -60,7 +88,17 @@ app.use(
 
 
 // =========================
-// LEADERBOARD ROUTES
+// PREMIUM ROUTE
+// =========================
+
+app.use(
+    "/premium",
+    premiumRoute
+);
+
+
+// =========================
+// LEADERBOARD ROUTE
 // =========================
 
 app.use(
@@ -73,13 +111,16 @@ app.use(
 // TEST ROUTE
 // =========================
 
-app.get("/", (req, res) => {
+app.get(
+    "/",
+    (req, res) => {
 
-    res.json({
-        message: "Expense API is running"
-    });
+        res.json({
+            message: "Expense API is running"
+        });
 
-});
+    }
+);
 
 
 // =========================
@@ -90,7 +131,6 @@ async function startServer() {
 
     try {
 
-        // Database connection
         await sequelize.authenticate();
 
         console.log(
@@ -98,7 +138,6 @@ async function startServer() {
         );
 
 
-        // Sync database tables
         await sequelize.sync({
             alter: true
         });
@@ -108,14 +147,16 @@ async function startServer() {
         );
 
 
-        // Start server
-        app.listen(3001, () => {
+        app.listen(
+            3001,
+            () => {
 
-            console.log(
-                "Server running on port 3001"
-            );
+                console.log(
+                    "Server running on port 3001"
+                );
 
-        });
+            }
+        );
 
     } catch (error) {
 
@@ -130,10 +171,5 @@ async function startServer() {
     }
 
 }
-
-
-// =========================
-// RUN SERVER
-// =========================
 
 startServer();

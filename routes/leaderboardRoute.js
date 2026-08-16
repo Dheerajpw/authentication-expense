@@ -4,7 +4,8 @@ const {
     getLeaderboard
 } = require("../leaderboardController");
 
-const authenticateToken = require("../authMiddleware");
+const authenticateToken =
+    require("../authMiddleware");
 
 const router = express.Router();
 
@@ -19,5 +20,9 @@ router.get(
     getLeaderboard
 );
 
+
+// =========================
+// EXPORT
+// =========================
 
 module.exports = router;

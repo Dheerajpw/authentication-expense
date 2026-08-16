@@ -1,6 +1,10 @@
-const { QueryTypes } = require("sequelize");
+const {
+    fn,
+    col
+} = require("sequelize");
 
-const sequelize = require("./db");
+const User = require("./User");
+const Expense = require("./Expense");
 
 
 // =========================
@@ -11,52 +15,55 @@ const getLeaderboard = async (req, res) => {
 
     try {
 
-        // Logged-in user ID
+        // =========================
+        // LOGGED-IN USER ID
+        // =========================
+
         const userId = req.user.id;
 
 
         // =========================
-        // CHECK PREMIUM STATUS
+        // CHECK CURRENT USER
         // =========================
 
-        const users = await sequelize.query(
-            `
-            SELECT
-                id,
-                name,
-                isPremium
-            FROM users
-            WHERE id = ?
-            `,
+        const currentUser = await User.findByPk(
+            userId,
             {
-                replacements: [userId],
-                type: QueryTypes.SELECT
+                attributes: [
+                    "id",
+                    "name",
+                    "isPremium"
+                ]
             }
         );
 
 
-        if (users.length === 0) {
+        if (!currentUser) {
 
             return res.status(404).json({
+
                 success: false,
+
                 message: "User not found"
+
             });
 
         }
-
-
-        const user = users[0];
 
 
         // =========================
         // PREMIUM CHECK
         // =========================
 
-        if (Number(user.isPremium) !== 1) {
+        if (!currentUser.isPremium) {
 
             return res.status(403).json({
+
                 success: false,
-                message: "Leaderboard is available only for premium users"
+
+                message:
+                    "Leaderboard is available only for premium users"
+
             });
 
         }
@@ -66,50 +73,148 @@ const getLeaderboard = async (req, res) => {
         // GET LEADERBOARD
         // =========================
 
-        const leaderboard = await sequelize.query(
-            `
-            SELECT
-                u.id,
-                u.name,
-                u.isPremium,
-                COALESCE(SUM(e.amount), 0) AS totalExpense
-            FROM users u
-            LEFT JOIN Expenses e
-                ON u.id = e.userId
-            GROUP BY
-                u.id,
-                u.name,
-                u.isPremium
-            ORDER BY
-                totalExpense DESC
-            `,
-            {
-                type: QueryTypes.SELECT
-            }
-        );
+        const leaderboard = await User.findAll({
+
+            attributes: [
+
+                "id",
+
+                "name",
+
+                "isPremium",
+
+                [
+                    fn(
+                        "COALESCE",
+                        fn(
+                            "SUM",
+                            col("Expenses.amount")
+                        ),
+                        0
+                    ),
+
+                    "totalExpense"
+                ]
+
+            ],
 
 
-        // =========================
-        // SUCCESS RESPONSE
-        // =========================
+            // =========================
+            // JOIN EXPENSE
+            // =========================
 
-        res.status(200).json({
-            success: true,
-            leaderboard: leaderboard
+            include: [
+
+                {
+                    model: Expense,
+
+                    as: "Expenses",
+
+                    attributes: [],
+
+                    required: false
+                }
+
+            ],
+
+
+            // =========================
+            // GROUP
+            // =========================
+
+            group: [
+
+                "User.id",
+
+                "User.name",
+
+                "User.isPremium"
+
+            ],
+
+
+            // =========================
+            // ORDER
+            // =========================
+
+            order: [
+
+                [
+                    "totalExpense",
+                    "DESC"
+                ]
+
+            ],
+
+
+            raw: true
+
         });
 
+
+        // =========================
+        // ADD RANK
+        // =========================
+
+        const rankedLeaderboard =
+            leaderboard.map(
+                (user, index) => {
+
+                    return {
+
+                        rank: index + 1,
+
+                        userId: user.id,
+
+                        name: user.name,
+
+                        isPremium:
+                            Boolean(
+                                user.isPremium
+                            ),
+
+                        totalExpense:
+                            Number(
+                                user.totalExpense
+                            )
+
+                    };
+
+                }
+            );
+
+
+        // =========================
+        // SUCCESS
+        // =========================
+
+        return res.status(200).json({
+
+            success: true,
+
+            leaderboard:
+                rankedLeaderboard
+
+        });
 
     } catch (error) {
 
         console.log(
             "Leaderboard Error:",
-            error.message
+            error
         );
 
 
-        res.status(500).json({
+        return res.status(500).json({
+
             success: false,
-            message: "Failed to fetch leaderboard"
+
+            message:
+                "Failed to fetch leaderboard",
+
+            error:
+                error.message
+
         });
 
     }

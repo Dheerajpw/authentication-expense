@@ -11,9 +11,27 @@ const showLeaderboard = async (req, res) => {
 
     try {
 
+        // Check logged-in user
+        const currentUser = await User.findByPk(req.user.id);
+
+        if (!currentUser) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        // Premium check
+        if (!currentUser.isPremium) {
+
+            return res.status(403).json({
+                message: "Premium membership required to view leaderboard"
+            });
+
+        }
+
+
         // =========================
-        // FIND ALL EXPENSES
-        // GROUP BY USER ID
+        // GET LEADERBOARD
         // =========================
 
         const leaderboard = await Expense.findAll({
@@ -36,11 +54,12 @@ const showLeaderboard = async (req, res) => {
             ],
 
             raw: true
+
         });
 
 
         // =========================
-        // GET USER NAMES
+        // GET USER DETAILS
         // =========================
 
         const result = [];
@@ -55,10 +74,12 @@ const showLeaderboard = async (req, res) => {
 
                 attributes: [
                     "id",
-                    "name"
+                    "name",
+                    "isPremium"
                 ],
 
                 raw: true
+
             });
 
 
@@ -69,6 +90,8 @@ const showLeaderboard = async (req, res) => {
                     userId: user.id,
 
                     name: user.name,
+
+                    isPremium: user.isPremium,
 
                     totalExpense:
                         Number(item.totalExpense)
@@ -93,6 +116,8 @@ const showLeaderboard = async (req, res) => {
 
                     name: user.name,
 
+                    isPremium: user.isPremium,
+
                     totalExpense:
                         user.totalExpense
 
@@ -102,10 +127,12 @@ const showLeaderboard = async (req, res) => {
 
 
         // =========================
-        // SEND RESPONSE
+        // RESPONSE
         // =========================
 
-        res.status(200).json({
+        return res.status(200).json({
+
+            success: true,
 
             message:
                 "Leaderboard fetched successfully",
@@ -115,6 +142,7 @@ const showLeaderboard = async (req, res) => {
 
         });
 
+
     } catch (error) {
 
         console.log(
@@ -122,7 +150,9 @@ const showLeaderboard = async (req, res) => {
             error
         );
 
-        res.status(500).json({
+        return res.status(500).json({
+
+            success: false,
 
             message:
                 "Failed to fetch leaderboard",
