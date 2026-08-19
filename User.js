@@ -26,16 +26,6 @@ const User = sequelize.define(
             allowNull: false
         },
 
-        resetToken: {
-            type: DataTypes.STRING(255),
-            allowNull: true
-        },
-
-        resetTokenExpiry: {
-            type: DataTypes.DATE,
-            allowNull: true
-        },
-
         isPremium: {
             type: DataTypes.BOOLEAN,
             allowNull: false,
@@ -47,5 +37,28 @@ const User = sequelize.define(
         timestamps: false
     }
 );
+
+
+// =====================================================
+// FORGOT PASSWORD REQUEST RELATIONSHIP
+// =====================================================
+
+const ForgotPasswordRequest =
+    require("./ForgotPasswordRequest");
+
+User.hasMany(
+    ForgotPasswordRequest,
+    {
+        foreignKey: "userId"
+    }
+);
+
+ForgotPasswordRequest.belongsTo(
+    User,
+    {
+        foreignKey: "userId"
+    }
+);
+
 
 module.exports = User;

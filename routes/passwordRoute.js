@@ -1,6 +1,8 @@
 const express = require("express");
-const crypto = require("crypto");
+const { v4: uuidv4 } = require("uuid");
+const bcrypt = require("bcryptjs");
 const User = require("../User");
+const ForgotPasswordRequest = require("../ForgotPasswordRequest");
 const { BrevoClient } = require("@getbrevo/brevo");
 
 const router = express.Router();
@@ -29,10 +31,6 @@ router.post(
             const { email } = req.body;
 
 
-            // =================================================
-            // VALIDATION
-            // =================================================
-
             if (!email || !email.trim()) {
 
                 return res.status(400).json({
@@ -50,10 +48,6 @@ router.post(
                 email.trim().toLowerCase();
 
 
-            // =================================================
-            // FIND USER
-            // =================================================
-
             const user =
                 await User.findOne({
 
@@ -63,10 +57,6 @@ router.post(
 
                 });
 
-
-            // =================================================
-            // USER NOT FOUND
-            // =================================================
 
             if (!user) {
 
@@ -83,45 +73,40 @@ router.post(
 
 
             // =================================================
-            // GENERATE RESET TOKEN
+            // GENERATE UUID
             // =================================================
 
-            const resetToken =
-                crypto.randomBytes(32).toString("hex");
-
-
-            // Token valid for 15 minutes
-            const resetTokenExpiry =
-                new Date(
-                    Date.now() + 15 * 60 * 1000
-                );
+            const requestId =
+                uuidv4();
 
 
             // =================================================
-            // SAVE TOKEN
+            // CREATE REQUEST
             // =================================================
 
-            user.resetToken =
-                resetToken;
+            await ForgotPasswordRequest.create({
 
-            user.resetTokenExpiry =
-                resetTokenExpiry;
+                id: requestId,
 
-            await user.save();
+                userId: user.id,
+
+                isActive: true
+
+            });
 
 
             console.log(
-                "Password reset token generated for:",
-                user.email
+                "Forgot password request created:",
+                requestId
             );
 
 
             // =================================================
-            // RESET PASSWORD LINK
+            // RESET LINK
             // =================================================
 
             const resetLink =
-                `http://127.0.0.1:5502/reset-password.html?token=${resetToken}`;
+                `http://localhost:3001/password/resetpassword/${requestId}`;
 
 
             // =================================================
@@ -146,11 +131,12 @@ router.post(
                         </p>
 
                         <p>
-                            This link will expire in
-                            <strong>15 minutes</strong>.
+                            Click the button below to reset
+                            your password.
                         </p>
 
                         <p>
+
                             <a
                                 href="${resetLink}"
                                 style="
@@ -164,6 +150,7 @@ router.post(
                             >
                                 Reset Password
                             </a>
+
                         </p>
 
                         <p>
@@ -204,10 +191,6 @@ router.post(
             );
 
 
-            // =================================================
-            // SUCCESS
-            // =================================================
-
             return res.status(200).json({
 
                 success: true,
@@ -239,8 +222,376 @@ router.post(
 
     }
 );
+
+
 // =====================================================
-// RESET PASSWORD
+// OPEN RESET PASSWORD LINK
+// GET /password/resetpassword/:requestId
+// =====================================================
+
+router.get(
+    "/resetpassword/:requestId",
+    async (req, res) => {
+
+        try {
+
+            const { requestId } =
+                req.params;
+
+
+            // =================================================
+            // FIND REQUEST
+            // =================================================
+
+            const request =
+                await ForgotPasswordRequest.findOne({
+
+                    where: {
+                        id: requestId
+                    }
+
+                });
+
+
+            // =================================================
+            // REQUEST NOT FOUND
+            // =================================================
+
+            if (!request) {
+
+                return res.status(404).send(
+                    "Invalid password reset request."
+                );
+
+            }
+
+
+            // =================================================
+            // CHECK ACTIVE
+            // =================================================
+
+            if (!request.isActive) {
+
+                return res.status(400).send(
+                    "This password reset link has already been used."
+                );
+
+            }
+
+
+            // =================================================
+            // RESET PASSWORD FORM
+            // =================================================
+
+            return res.status(200).send(`
+
+                <!DOCTYPE html>
+
+                <html>
+
+                <head>
+
+                    <meta charset="UTF-8">
+
+                    <meta
+                        name="viewport"
+                        content="width=device-width, initial-scale=1.0"
+                    >
+
+                    <title>
+                        Reset Password
+                    </title>
+
+                    <style>
+
+                        body {
+
+                            font-family: Arial, sans-serif;
+
+                            background: #f4f4f4;
+
+                            display: flex;
+
+                            justify-content: center;
+
+                            align-items: center;
+
+                            min-height: 100vh;
+
+                            margin: 0;
+
+                        }
+
+                        .container {
+
+                            background: white;
+
+                            padding: 30px;
+
+                            width: 350px;
+
+                            border-radius: 10px;
+
+                            box-shadow:
+                                0 4px 15px
+                                rgba(0,0,0,0.15);
+
+                        }
+
+                        h2 {
+
+                            text-align: center;
+
+                            margin-bottom: 25px;
+
+                        }
+
+                        label {
+
+                            display: block;
+
+                            margin-bottom: 7px;
+
+                        }
+
+                        input {
+
+                            width: 100%;
+
+                            padding: 10px;
+
+                            margin-bottom: 15px;
+
+                            box-sizing: border-box;
+
+                            border: 1px solid #ccc;
+
+                            border-radius: 5px;
+
+                        }
+
+                        button {
+
+                            width: 100%;
+
+                            padding: 11px;
+
+                            border: none;
+
+                            border-radius: 5px;
+
+                            background: #007bff;
+
+                            color: white;
+
+                            font-size: 16px;
+
+                            cursor: pointer;
+
+                        }
+
+                        button:hover {
+
+                            background: #0056b3;
+
+                        }
+
+                        #message {
+
+                            text-align: center;
+
+                            margin-top: 15px;
+
+                        }
+
+                    </style>
+
+                </head>
+
+
+                <body>
+
+                    <div class="container">
+
+                        <h2>
+                            Reset Password
+                        </h2>
+
+
+                        <form
+                            id="resetPasswordForm"
+                        >
+
+                            <label>
+                                New Password
+                            </label>
+
+                            <input
+                                type="password"
+                                id="password"
+                                required
+                                minlength="6"
+                            >
+
+
+                            <label>
+                                Confirm Password
+                            </label>
+
+                            <input
+                                type="password"
+                                id="confirmPassword"
+                                required
+                                minlength="6"
+                            >
+
+
+                            <button
+                                type="submit"
+                            >
+                                Update Password
+                            </button>
+
+                        </form>
+
+
+                        <div id="message"></div>
+
+                    </div>
+
+
+                    <script>
+
+                        const form =
+                            document.getElementById(
+                                "resetPasswordForm"
+                            );
+
+
+                        const message =
+                            document.getElementById(
+                                "message"
+                            );
+
+
+                        form.addEventListener(
+                            "submit",
+                            async function(event) {
+
+                                event.preventDefault();
+
+
+                                const password =
+                                    document.getElementById(
+                                        "password"
+                                    ).value;
+
+
+                                const confirmPassword =
+                                    document.getElementById(
+                                        "confirmPassword"
+                                    ).value;
+
+
+                                if (
+                                    password !==
+                                    confirmPassword
+                                ) {
+
+                                    message.innerText =
+                                        "Passwords do not match.";
+
+                                    return;
+
+                                }
+
+
+                                try {
+
+                                    const response =
+                                        await fetch(
+                                            "/password/resetpassword",
+                                            {
+
+                                                method: "PUT",
+
+                                                headers: {
+
+                                                    "Content-Type":
+                                                        "application/json"
+
+                                                },
+
+                                                body:
+                                                    JSON.stringify({
+
+                                                        requestId:
+                                                            "${requestId}",
+
+                                                        password:
+                                                            password
+
+                                                    })
+
+                                            }
+                                        );
+
+
+                                    const data =
+                                        await response.json();
+
+
+                                    message.innerText =
+                                        data.message;
+
+
+                                    if (data.success) {
+
+                                        form.style.display =
+                                            "none";
+
+                                    }
+
+                                }
+                                catch (error) {
+
+                                    message.innerText =
+                                        "Something went wrong.";
+
+                                }
+
+                            }
+                        );
+
+                    </script>
+
+                </body>
+
+                </html>
+
+            `);
+
+        }
+        catch (error) {
+
+            console.error(
+                "RESET LINK ERROR:",
+                error
+            );
+
+
+            return res.status(500).send(
+                "Something went wrong."
+            );
+
+        }
+
+    }
+);
+
+
+// =====================================================
+// UPDATE PASSWORD
 // PUT /password/resetpassword
 // =====================================================
 
@@ -250,21 +601,24 @@ router.put(
 
         try {
 
-            const { token, password } = req.body;
+            const {
+                requestId,
+                password
+            } = req.body;
 
 
             // =================================================
             // VALIDATION
             // =================================================
 
-            if (!token || !password) {
+            if (!requestId || !password) {
 
                 return res.status(400).json({
 
                     success: false,
 
                     message:
-                        "Token and password are required."
+                        "Request ID and password are required."
 
                 });
 
@@ -272,31 +626,77 @@ router.put(
 
 
             // =================================================
-            // FIND USER USING TOKEN
+            // FIND REQUEST
             // =================================================
 
-            const user =
-                await User.findOne({
+            const request =
+                await ForgotPasswordRequest.findOne({
 
                     where: {
-                        resetToken: token
+                        id: requestId
                     }
 
                 });
 
 
             // =================================================
-            // INVALID TOKEN
+            // REQUEST NOT FOUND
             // =================================================
+
+            if (!request) {
+
+                return res.status(404).json({
+
+                    success: false,
+
+                    message:
+                        "Invalid password reset request."
+
+                });
+
+            }
+
+
+            // =================================================
+            // CHECK ACTIVE
+            // =================================================
+
+            if (!request.isActive) {
+
+                return res.status(400).json({
+
+                    success: false,
+
+                    message:
+                        "This password reset link has already been used."
+
+                });
+
+            }
+
+
+            // =================================================
+            // FIND USER
+            // =================================================
+
+            const user =
+                await User.findOne({
+
+                    where: {
+                        id: request.userId
+                    }
+
+                });
+
 
             if (!user) {
 
-                return res.status(400).json({
+                return res.status(404).json({
 
                     success: false,
 
                     message:
-                        "Invalid or expired reset token."
+                        "User not found."
 
                 });
 
@@ -304,25 +704,14 @@ router.put(
 
 
             // =================================================
-            // CHECK TOKEN EXPIRY
+            // HASH PASSWORD
             // =================================================
 
-            if (
-                !user.resetTokenExpiry ||
-                new Date() >
-                new Date(user.resetTokenExpiry)
-            ) {
-
-                return res.status(400).json({
-
-                    success: false,
-
-                    message:
-                        "Reset token has expired."
-
-                });
-
-            }
+            const hashedPassword =
+                await bcrypt.hash(
+                    password,
+                    10
+                );
 
 
             // =================================================
@@ -330,21 +719,19 @@ router.put(
             // =================================================
 
             user.password =
-                password;
-
-
-            // =================================================
-            // CLEAR RESET TOKEN
-            // =================================================
-
-            user.resetToken =
-                null;
-
-            user.resetTokenExpiry =
-                null;
-
+                hashedPassword;
 
             await user.save();
+
+
+            // =================================================
+            // MAKE REQUEST INACTIVE
+            // =================================================
+
+            request.isActive =
+                false;
+
+            await request.save();
 
 
             console.log(
@@ -388,5 +775,6 @@ router.put(
 
     }
 );
+
 
 module.exports = router;
