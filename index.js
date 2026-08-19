@@ -9,13 +9,9 @@ console.log("======================================");
 console.log("GEMINI API KEY CHECK");
 
 if (process.env.GEMINI_API_KEY) {
-
     console.log("GEMINI API KEY: LOADED ✅");
-
 } else {
-
     console.log("GEMINI API KEY: NOT FOUND ❌");
-
 }
 
 console.log("======================================");
@@ -71,6 +67,14 @@ const premiumRoute =
 
 const leaderboardRoute =
     require("./routes/leaderboardRoute");
+
+
+// =====================================================
+// PASSWORD ROUTE
+// =====================================================
+
+const passwordRoute =
+    require("./routes/passwordRoute");
 
 
 // =====================================================
@@ -132,6 +136,16 @@ app.use(
 app.use(
     "/leaderboard",
     leaderboardRoute
+);
+
+
+// =====================================================
+// PASSWORD ROUTES
+// =====================================================
+
+app.use(
+    "/password",
+    passwordRoute
 );
 
 

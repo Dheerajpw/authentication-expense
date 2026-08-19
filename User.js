@@ -26,6 +26,16 @@ const User = sequelize.define(
             allowNull: false
         },
 
+        resetToken: {
+            type: DataTypes.STRING(255),
+            allowNull: true
+        },
+
+        resetTokenExpiry: {
+            type: DataTypes.DATE,
+            allowNull: true
+        },
+
         isPremium: {
             type: DataTypes.BOOLEAN,
             allowNull: false,
