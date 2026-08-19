@@ -1,18 +1,21 @@
-
 require("dotenv").config();
 
 
 // =====================================================
-// CHECK OPENAI API KEY
+// CHECK GEMINI API KEY
 // =====================================================
 
 console.log("======================================");
-console.log("OPENAI API KEY CHECK");
+console.log("GEMINI API KEY CHECK");
 
-if (process.env.OPENAI_API_KEY) {
-    console.log("OPENAI API KEY: LOADED ✅");
+if (process.env.GEMINI_API_KEY) {
+
+    console.log("GEMINI API KEY: LOADED ✅");
+
 } else {
-    console.log("OPENAI API KEY: NOT FOUND ❌");
+
+    console.log("GEMINI API KEY: NOT FOUND ❌");
+
 }
 
 console.log("======================================");

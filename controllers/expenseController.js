@@ -1,4 +1,15 @@
 const Expense = require("../Expense");
+const { GoogleGenAI } = require("@google/genai");
+
+
+// =====================================================
+// GEMINI AI
+// =====================================================
+
+const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY
+});
+
 
 // =====================================================
 // ALLOWED CATEGORIES
@@ -15,7 +26,7 @@ const allowedCategories = [
 
 
 // =====================================================
-// FREE AI-LIKE CATEGORY FUNCTION
+// AI CATEGORY FUNCTION
 // =====================================================
 
 const getAICategory = async (description) => {
@@ -26,223 +37,87 @@ const getAICategory = async (description) => {
             return "Other";
         }
 
-        const text = description
-            .toLowerCase()
-            .trim();
+        // Agar Gemini API key nahi hai
+        if (!process.env.GEMINI_API_KEY) {
 
+            console.log(
+                "GEMINI_API_KEY not found. Using Other."
+            );
 
-        // =================================================
-        // FOOD
-        // =================================================
-
-        const foodKeywords = [
-            "pizza",
-            "burger",
-            "food",
-            "restaurant",
-            "hotel",
-            "biryani",
-            "chicken",
-            "mutton",
-            "fish",
-            "rice",
-            "dal",
-            "roti",
-            "paratha",
-            "paneer",
-            "sandwich",
-            "coffee",
-            "tea",
-            "chai",
-            "breakfast",
-            "lunch",
-            "dinner",
-            "snacks",
-            "grocery",
-            "groceries",
-            "milk",
-            "bread",
-            "vegetable",
-            "vegetables",
-            "fruit",
-            "fruits",
-            "swiggy",
-            "zomato",
-            "dominos",
-            "kfc",
-            "mcdonald",
-            "starbucks"
-        ];
-
-
-        if (
-            foodKeywords.some(keyword =>
-                text.includes(keyword)
-            )
-        ) {
-
-            return "Food";
-
+            return "Other";
         }
 
 
-        // =================================================
-        // TRAVEL
-        // =================================================
+        const prompt = `
+You are an expense categorization AI.
 
-        const travelKeywords = [
-            "petrol",
-            "diesel",
-            "fuel",
-            "uber",
-            "ola",
-            "rapido",
-            "taxi",
-            "cab",
-            "bus",
-            "train",
-            "flight",
-            "airline",
-            "airport",
-            "metro",
-            "travel",
-            "trip",
-            "hotel booking",
-            "toll",
-            "parking"
-        ];
+Categorize this expense into EXACTLY ONE of these categories:
+
+Food
+Travel
+Shopping
+Bills
+Entertainment
+Other
+
+Expense description:
+"${description}"
+
+Rules:
+- Return ONLY the category name.
+- Do not return explanation.
+- Do not return punctuation.
+- Do not return JSON.
+- If uncertain, return Other.
+`;
 
 
-        if (
-            travelKeywords.some(keyword =>
-                text.includes(keyword)
-            )
-        ) {
+        const response =
+            await ai.models.generateContent({
 
-            return "Travel";
+                model: "gemini-3.5-flash-lite",
 
-        }
+                contents: prompt
 
-
-        // =================================================
-        // SHOPPING
-        // =================================================
-
-        const shoppingKeywords = [
-            "shopping",
-            "amazon",
-            "flipkart",
-            "myntra",
-            "clothes",
-            "shirt",
-            "tshirt",
-            "jeans",
-            "shoes",
-            "watch",
-            "mobile",
-            "phone",
-            "laptop",
-            "computer",
-            "headphone",
-            "earphone",
-            "electronics",
-            "furniture",
-            "grocery shopping",
-            "purchase",
-            "bought"
-        ];
+            });
 
 
-        if (
-            shoppingKeywords.some(keyword =>
-                text.includes(keyword)
-            )
-        ) {
+        let category =
+            response.text
+                ?.trim()
+                .replace(/["'.]/g, "");
 
-            return "Shopping";
+
+        console.log(
+            "Gemini response:",
+            category
+        );
+
+
+        // Exact allowed category check
+        const matchedCategory =
+            allowedCategories.find(
+                item =>
+                    item.toLowerCase() ===
+                    category.toLowerCase()
+            );
+
+
+        if (matchedCategory) {
+
+            return matchedCategory;
 
         }
 
-
-        // =================================================
-        // BILLS
-        // =================================================
-
-        const billKeywords = [
-            "bill",
-            "electricity",
-            "electric",
-            "water bill",
-            "gas bill",
-            "internet",
-            "wifi",
-            "broadband",
-            "mobile recharge",
-            "recharge",
-            "phone bill",
-            "rent",
-            "emi",
-            "loan",
-            "insurance",
-            "subscription"
-        ];
-
-
-        if (
-            billKeywords.some(keyword =>
-                text.includes(keyword)
-            )
-        ) {
-
-            return "Bills";
-
-        }
-
-
-        // =================================================
-        // ENTERTAINMENT
-        // =================================================
-
-        const entertainmentKeywords = [
-            "movie",
-            "cinema",
-            "netflix",
-            "prime video",
-            "hotstar",
-            "spotify",
-            "game",
-            "gaming",
-            "concert",
-            "party",
-            "club",
-            "entertainment",
-            "youtube premium",
-            "disney"
-        ];
-
-
-        if (
-            entertainmentKeywords.some(keyword =>
-                text.includes(keyword)
-            )
-        ) {
-
-            return "Entertainment";
-
-        }
-
-
-        // =================================================
-        // OTHER
-        // =================================================
 
         return "Other";
 
 
-    } catch (error) {
+    }
+    catch (error) {
 
         console.error(
-            "CATEGORY ERROR:",
+            "GEMINI CATEGORY ERROR:",
             error.message
         );
 
@@ -261,7 +136,9 @@ const createExpense = async (req, res) => {
 
     try {
 
-        const userId = req.user.id;
+        const userId =
+            req.user.id;
+
 
         const {
             amount,
@@ -296,7 +173,7 @@ const createExpense = async (req, res) => {
 
 
         // =================================================
-        // FREE AI CATEGORY
+        // GEMINI AI CATEGORY
         // =================================================
 
         const category =
@@ -357,7 +234,8 @@ const createExpense = async (req, res) => {
         });
 
 
-    } catch (error) {
+    }
+    catch (error) {
 
         console.error(
             "CREATE EXPENSE ERROR:",
@@ -398,18 +276,14 @@ const getExpenses = async (req, res) => {
             await Expense.findAll({
 
                 where: {
-
                     userId
-
                 },
 
                 order: [
-
                     [
                         "date",
                         "DESC"
                     ]
-
                 ]
 
             });
@@ -420,7 +294,8 @@ const getExpenses = async (req, res) => {
         );
 
 
-    } catch (error) {
+    }
+    catch (error) {
 
         console.error(
             "GET EXPENSE ERROR:",
@@ -500,7 +375,8 @@ const deleteExpense = async (req, res) => {
         });
 
 
-    } catch (error) {
+    }
+    catch (error) {
 
         console.error(
             "DELETE EXPENSE ERROR:",
@@ -575,7 +451,7 @@ const updateExpense = async (req, res) => {
 
 
         // =================================================
-        // CATEGORY AGAIN
+        // GEMINI AI CATEGORY
         // =================================================
 
         const category =
@@ -583,6 +459,10 @@ const updateExpense = async (req, res) => {
                 description
             );
 
+
+        console.log(
+            "================================"
+        );
 
         console.log(
             "UPDATED DESCRIPTION:",
@@ -594,9 +474,13 @@ const updateExpense = async (req, res) => {
             category
         );
 
+        console.log(
+            "================================"
+        );
+
 
         // =================================================
-        // UPDATE
+        // UPDATE EXPENSE
         // =================================================
 
         const [updated] =
@@ -674,7 +558,8 @@ const updateExpense = async (req, res) => {
         });
 
 
-    } catch (error) {
+    }
+    catch (error) {
 
         console.error(
             "UPDATE EXPENSE ERROR:",
