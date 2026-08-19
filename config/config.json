@@ -1,0 +1,25 @@
+{
+  "development": {
+    "username": "root",
+    "password": "Dheeraj@123",
+    "database": "expense_tracker",
+    "host": "localhost",
+    "dialect": "mysql"
+  },
+
+  "test": {
+    "username": "root",
+    "password": "Dheeraj@123",
+    "database": "expense_tracker",
+    "host": "localhost",
+    "dialect": "mysql"
+  },
+
+  "production": {
+    "username": "root",
+    "password": "Dheeraj@123",
+    "database": "expense_tracker",
+    "host": "localhost",
+    "dialect": "mysql"
+  }
+}

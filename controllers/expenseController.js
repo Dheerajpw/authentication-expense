@@ -1,4 +1,3 @@
-
 const Expense = require("../Expense");
 const sequelize = require("../db");
 const { GoogleGenAI } = require("@google/genai");
@@ -39,11 +38,6 @@ const getAICategory = async (description) => {
             return "Other";
         }
 
-
-        // =================================================
-        // GEMINI API KEY CHECK
-        // =================================================
-
         if (!process.env.GEMINI_API_KEY) {
 
             console.log(
@@ -52,11 +46,6 @@ const getAICategory = async (description) => {
 
             return "Other";
         }
-
-
-        // =================================================
-        // GEMINI PROMPT
-        // =================================================
 
         const prompt = `
 You are an expense categorization AI.
@@ -81,11 +70,6 @@ Rules:
 - If uncertain, return Other.
 `;
 
-
-        // =================================================
-        // GEMINI REQUEST
-        // =================================================
-
         const response =
             await ai.models.generateContent({
 
@@ -95,26 +79,15 @@ Rules:
 
             });
 
-
-        // =================================================
-        // GET CATEGORY
-        // =================================================
-
         let category =
             response.text
                 ?.trim()
                 .replace(/["'.]/g, "");
 
-
         console.log(
             "Gemini response:",
             category
         );
-
-
-        // =================================================
-        // CHECK ALLOWED CATEGORY
-        // =================================================
 
         const matchedCategory =
             allowedCategories.find(
@@ -123,13 +96,11 @@ Rules:
                     category?.toLowerCase()
             );
 
-
         if (matchedCategory) {
 
             return matchedCategory;
 
         }
-
 
         return "Other";
 
@@ -160,11 +131,11 @@ const createExpense = async (req, res) => {
         const userId =
             req.user.id;
 
-
         const {
             amount,
             description,
-            date
+            date,
+            note
         } = req.body;
 
 
@@ -194,6 +165,17 @@ const createExpense = async (req, res) => {
 
 
         // =================================================
+        // CLEAN NOTE
+        // =================================================
+
+        const cleanNote =
+            note === undefined ||
+            note === null
+                ? null
+                : String(note).trim();
+
+
+        // =================================================
         // GEMINI CATEGORY
         // =================================================
 
@@ -210,6 +192,11 @@ const createExpense = async (req, res) => {
         console.log(
             "DESCRIPTION:",
             description
+        );
+
+        console.log(
+            "NOTE:",
+            cleanNote
         );
 
         console.log(
@@ -244,7 +231,10 @@ const createExpense = async (req, res) => {
 
                                 category,
 
-                                date
+                                date,
+
+                                note:
+                                    cleanNote
 
                             },
 
@@ -307,15 +297,6 @@ const createExpense = async (req, res) => {
 // =====================================================
 // GET EXPENSES
 // GET /expenses?page=1&limit=10
-//
-// DYNAMIC PAGINATION
-//
-// Allowed limits:
-// 5
-// 10
-// 20
-// 30
-// 40
 // =====================================================
 
 const getExpenses = async (req, res) => {
@@ -326,10 +307,6 @@ const getExpenses = async (req, res) => {
             req.user.id;
 
 
-        // =================================================
-        // PAGE
-        // =================================================
-
         const page =
             Math.max(
                 parseInt(req.query.page) || 1,
@@ -337,17 +314,9 @@ const getExpenses = async (req, res) => {
             );
 
 
-        // =================================================
-        // LIMIT
-        // =================================================
-
         let limit =
             parseInt(req.query.limit) || 10;
 
-
-        // =================================================
-        // ALLOWED LIMITS
-        // =================================================
 
         const allowedLimits = [
             5,
@@ -358,10 +327,6 @@ const getExpenses = async (req, res) => {
         ];
 
 
-        // =================================================
-        // INVALID LIMIT
-        // =================================================
-
         if (
             !allowedLimits.includes(limit)
         ) {
@@ -371,17 +336,9 @@ const getExpenses = async (req, res) => {
         }
 
 
-        // =================================================
-        // OFFSET
-        // =================================================
-
         const offset =
             (page - 1) * limit;
 
-
-        // =================================================
-        // GET PAGINATED EXPENSES
-        // =================================================
 
         const result =
             await Expense.findAndCountAll({
@@ -395,19 +352,13 @@ const getExpenses = async (req, res) => {
                 order: [
 
                     [
-
                         "date",
-
                         "DESC"
-
                     ],
 
                     [
-
                         "id",
-
                         "DESC"
-
                     ]
 
                 ],
@@ -419,27 +370,15 @@ const getExpenses = async (req, res) => {
             });
 
 
-        // =================================================
-        // TOTAL EXPENSES
-        // =================================================
-
         const totalExpenses =
             result.count;
 
-
-        // =================================================
-        // TOTAL PAGES
-        // =================================================
 
         const totalPages =
             Math.ceil(
                 totalExpenses / limit
             );
 
-
-        // =================================================
-        // PAGE OUT OF RANGE
-        // =================================================
 
         if (
             totalPages > 0 &&
@@ -475,10 +414,6 @@ const getExpenses = async (req, res) => {
 
         }
 
-
-        // =================================================
-        // RESPONSE
-        // =================================================
 
         return res.status(200).json({
 
@@ -555,10 +490,6 @@ const deleteExpense = async (req, res) => {
             req.user.id;
 
 
-        // =================================================
-        // DATABASE TRANSACTION
-        // =================================================
-
         const deleted =
             await sequelize.transaction(
                 async (transaction) => {
@@ -578,10 +509,6 @@ const deleteExpense = async (req, res) => {
 
                         });
 
-
-                    // =====================================
-                    // EXPENSE NOT FOUND
-                    // =====================================
 
                     if (!deletedCount) {
 
@@ -604,10 +531,6 @@ const deleteExpense = async (req, res) => {
             );
 
 
-        // =================================================
-        // RESPONSE
-        // =================================================
-
         return res.status(200).json({
 
             success: true,
@@ -628,10 +551,6 @@ const deleteExpense = async (req, res) => {
         );
 
 
-        // =================================================
-        // NOT FOUND
-        // =================================================
-
         if (
             error.statusCode === 404
         ) {
@@ -647,10 +566,6 @@ const deleteExpense = async (req, res) => {
 
         }
 
-
-        // =================================================
-        // SERVER ERROR
-        // =================================================
 
         return res.status(500).json({
 
@@ -690,7 +605,8 @@ const updateExpense = async (req, res) => {
         const {
             amount,
             description,
-            date
+            date,
+            note
         } = req.body;
 
 
@@ -720,6 +636,17 @@ const updateExpense = async (req, res) => {
 
 
         // =================================================
+        // CLEAN NOTE
+        // =================================================
+
+        const cleanNote =
+            note === undefined ||
+            note === null
+                ? null
+                : String(note).trim();
+
+
+        // =================================================
         // GEMINI CATEGORY
         // =================================================
 
@@ -736,6 +663,11 @@ const updateExpense = async (req, res) => {
         console.log(
             "UPDATED DESCRIPTION:",
             description
+        );
+
+        console.log(
+            "UPDATED NOTE:",
+            cleanNote
         );
 
         console.log(
@@ -756,11 +688,6 @@ const updateExpense = async (req, res) => {
             await sequelize.transaction(
                 async (transaction) => {
 
-
-                    // =====================================
-                    // UPDATE
-                    // =====================================
-
                     const [updated] =
                         await Expense.update(
 
@@ -773,7 +700,10 @@ const updateExpense = async (req, res) => {
 
                                 category,
 
-                                date
+                                date,
+
+                                note:
+                                    cleanNote
 
                             },
 
@@ -794,10 +724,6 @@ const updateExpense = async (req, res) => {
                         );
 
 
-                    // =====================================
-                    // EXPENSE NOT FOUND
-                    // =====================================
-
                     if (!updated) {
 
                         const error =
@@ -812,10 +738,6 @@ const updateExpense = async (req, res) => {
 
                     }
 
-
-                    // =====================================
-                    // GET UPDATED EXPENSE
-                    // =====================================
 
                     const updatedExpense =
                         await Expense.findOne({
@@ -863,10 +785,6 @@ const updateExpense = async (req, res) => {
         );
 
 
-        // =================================================
-        // NOT FOUND
-        // =================================================
-
         if (
             error.statusCode === 404
         ) {
@@ -882,10 +800,6 @@ const updateExpense = async (req, res) => {
 
         }
 
-
-        // =================================================
-        // SERVER ERROR
-        // =================================================
 
         return res.status(500).json({
 
