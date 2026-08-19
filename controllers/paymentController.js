@@ -1,88 +1,123 @@
 const axios = require("axios");
+
 const Order = require("../Order");
+
 const sequelize = require("../db");
 
 
-// =========================
+// =====================================================
+// CASHFREE CONFIGURATION
+// =====================================================
+
+const CASHFREE_API_URL =
+    process.env.CASHFREE_API_URL ||
+    "https://sandbox.cashfree.com/pg";
+
+const CASHFREE_API_VERSION =
+    process.env.CASHFREE_API_VERSION ||
+    "2025-01-01";
+
+
+// =====================================================
 // CREATE ORDER
-// =========================
+// =====================================================
 
 const createOrder = async (req, res) => {
 
     try {
 
-        const userId = req.user.id;
+        const userId =
+            req.user.id;
 
-        // Premium price
+
+        // =================================================
+        // PREMIUM PRICE
+        // =================================================
+
         const amount = 100;
 
+
+        // =================================================
+        // CREATE UNIQUE ORDER ID
+        // =================================================
+
         const orderId =
-            "ORDER_" + userId + "_" + Date.now();
+            "ORDER_" +
+            userId +
+            "_" +
+            Date.now();
 
 
-        // =========================
+        // =================================================
         // CREATE CASHFREE ORDER
-        // =========================
+        // =================================================
 
-        const response = await axios.post(
+        const response =
+            await axios.post(
 
-            "https://sandbox.cashfree.com/pg/orders",
+                `${CASHFREE_API_URL}/orders`,
 
-            {
-                order_id: orderId,
+                {
 
-                order_amount: amount,
+                    order_id:
+                        orderId,
 
-                order_currency: "INR",
+                    order_amount:
+                        amount,
 
-                customer_details: {
+                    order_currency:
+                        "INR",
 
-                    customer_id:
-                        String(userId),
+                    customer_details: {
 
-                    customer_phone:
-                        "9999999999"
+                        customer_id:
+                            String(userId),
+
+                        customer_phone:
+                            process.env.PAYMENT_CUSTOMER_PHONE ||
+                            "9999999999"
+
+                    },
+
+                    order_meta: {
+
+                        return_url:
+                            process.env.CASHFREE_RETURN_URL ||
+                            "http://127.0.0.1:5503/expense%20tracker/index.html?order_id={order_id}"
+
+                    }
 
                 },
 
-                order_meta: {
+                {
 
-                    return_url:
-                        "http://127.0.0.1:5503/expense%20tracker/index.html?order_id={order_id}"
+                    headers: {
 
-                }
+                        "x-client-id":
+                            process.env.CASHFREE_APP_ID,
 
-            },
+                        "x-client-secret":
+                            process.env.CASHFREE_SECRET_KEY,
 
-            {
+                        "x-api-version":
+                            CASHFREE_API_VERSION,
 
-                headers: {
+                        "Content-Type":
+                            "application/json",
 
-                    "x-client-id":
-                        process.env.CASHFREE_APP_ID,
+                        "Accept":
+                            "application/json"
 
-                    "x-client-secret":
-                        process.env.CASHFREE_SECRET_KEY,
-
-                    "x-api-version":
-                        "2025-01-01",
-
-                    "Content-Type":
-                        "application/json",
-
-                    "Accept":
-                        "application/json"
+                    }
 
                 }
 
-            }
-
-        );
+            );
 
 
-        // =========================
-        // SAVE ORDER
-        // =========================
+        // =================================================
+        // SAVE ORDER IN DATABASE
+        // =================================================
 
         await Order.create({
 
@@ -101,9 +136,9 @@ const createOrder = async (req, res) => {
         });
 
 
-        // =========================
+        // =================================================
         // SEND RESPONSE
-        // =========================
+        // =================================================
 
         return res.status(201).json({
 
@@ -150,9 +185,9 @@ const createOrder = async (req, res) => {
 };
 
 
-// =========================
+// =====================================================
 // VERIFY PAYMENT
-// =========================
+// =====================================================
 
 const verifyPayment = async (req, res) => {
 
@@ -161,13 +196,14 @@ const verifyPayment = async (req, res) => {
         const userId =
             req.user.id;
 
+
         const orderId =
             req.params.orderId;
 
 
-        // =========================
+        // =================================================
         // FIND ORDER
-        // =========================
+        // =================================================
 
         const order =
             await Order.findOne({
@@ -197,14 +233,14 @@ const verifyPayment = async (req, res) => {
         }
 
 
-        // =========================
+        // =================================================
         // GET CASHFREE PAYMENTS
-        // =========================
+        // =================================================
 
         const response =
             await axios.get(
 
-                `https://sandbox.cashfree.com/pg/orders/${orderId}/payments`,
+                `${CASHFREE_API_URL}/orders/${orderId}/payments`,
 
                 {
 
@@ -217,7 +253,7 @@ const verifyPayment = async (req, res) => {
                             process.env.CASHFREE_SECRET_KEY,
 
                         "x-api-version":
-                            "2025-01-01",
+                            CASHFREE_API_VERSION,
 
                         "Accept":
                             "application/json"
@@ -239,28 +275,40 @@ const verifyPayment = async (req, res) => {
         );
 
 
-        // =========================
+        // =================================================
         // SUCCESS
-        // =========================
+        // =================================================
 
         if (
+
             Array.isArray(payments) &&
+
             payments.some(
+
                 payment =>
-                    payment.payment_status === "SUCCESS"
+                    payment.payment_status ===
+                    "SUCCESS"
+
             )
+
         ) {
 
-            // Update order
+
+            // =============================================
+            // UPDATE ORDER
+            // =============================================
 
             await Order.update(
 
                 {
+
                     status:
                         "SUCCESSFUL"
+
                 },
 
                 {
+
                     where: {
 
                         orderId:
@@ -276,7 +324,9 @@ const verifyPayment = async (req, res) => {
             );
 
 
-            // Make user premium
+            // =============================================
+            // MAKE USER PREMIUM
+            // =============================================
 
             await sequelize.query(
 
@@ -287,8 +337,10 @@ const verifyPayment = async (req, res) => {
                 `,
 
                 {
+
                     replacements:
                         [userId]
+
                 }
 
             );
@@ -322,27 +374,40 @@ const verifyPayment = async (req, res) => {
         }
 
 
-        // =========================
+        // =================================================
         // FAILED
-        // =========================
+        // =================================================
 
         if (
+
             Array.isArray(payments) &&
+
             payments.some(
+
                 payment =>
-                    payment.payment_status === "FAILED" ||
-                    payment.payment_status === "USER_DROPPED"
+
+                    payment.payment_status ===
+                    "FAILED" ||
+
+                    payment.payment_status ===
+                    "USER_DROPPED"
+
             )
+
         ) {
+
 
             await Order.update(
 
                 {
+
                     status:
                         "FAILED"
+
                 },
 
                 {
+
                     where: {
 
                         orderId:
@@ -377,9 +442,9 @@ const verifyPayment = async (req, res) => {
         }
 
 
-        // =========================
+        // =================================================
         // PENDING
-        // =========================
+        // =================================================
 
         return res.status(200).json({
 
@@ -401,9 +466,12 @@ const verifyPayment = async (req, res) => {
     } catch (error) {
 
         console.log(
+
             "Payment verification error:",
+
             error.response?.data ||
             error.message
+
         );
 
 
@@ -426,9 +494,9 @@ const verifyPayment = async (req, res) => {
 };
 
 
-// =========================
+// =====================================================
 // EXPORT
-// =========================
+// =====================================================
 
 module.exports = {
 

@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 
 
@@ -23,8 +24,12 @@ console.log("======================================");
 
 const express = require("express");
 const cors = require("cors");
+const morgan = require("morgan");
 
 const sequelize = require("./db");
+
+// LOGGER
+const { writeLog } = require("./logger");
 
 const User = require("./User");
 const Expense = require("./Expense");
@@ -33,18 +38,22 @@ require("./Order");
 
 
 // =====================================================
-// ASSOCIATIONS
+// CREATE INITIAL LOG
 // =====================================================
 
-// One User can have many Expenses
+writeLog("======================================");
+writeLog("Application starting...");
+writeLog("======================================");
+
+
+// =====================================================
+// ASSOCIATIONS
+// =====================================================
 
 User.hasMany(Expense, {
     foreignKey: "userId",
     as: "Expenses"
 });
-
-
-// One Expense belongs to one User
 
 Expense.belongsTo(User, {
     foreignKey: "userId",
@@ -68,11 +77,6 @@ const premiumRoute =
 const leaderboardRoute =
     require("./routes/leaderboardRoute");
 
-
-// =====================================================
-// PASSWORD ROUTE
-// =====================================================
-
 const passwordRoute =
     require("./routes/passwordRoute");
 
@@ -90,6 +94,30 @@ const app = express();
 
 app.use(cors());
 
+
+// =====================================================
+// MORGAN LOGGER
+// =====================================================
+
+app.use(
+    morgan("combined", {
+
+        stream: {
+
+            write: (message) => {
+
+                writeLog(
+                    `MORGAN: ${message.trim()}`
+                );
+
+            }
+
+        }
+
+    })
+);
+
+
 app.use(express.json());
 
 app.use(
@@ -100,7 +128,7 @@ app.use(
 
 
 // =====================================================
-// EXPENSE ROUTES
+// ROUTES
 // =====================================================
 
 app.use(
@@ -108,40 +136,20 @@ app.use(
     expenseRoute
 );
 
-
-// =====================================================
-// PAYMENT ROUTES
-// =====================================================
-
 app.use(
     "/payment",
     paymentRoute
 );
-
-
-// =====================================================
-// PREMIUM ROUTES
-// =====================================================
 
 app.use(
     "/premium",
     premiumRoute
 );
 
-
-// =====================================================
-// LEADERBOARD ROUTES
-// =====================================================
-
 app.use(
     "/leaderboard",
     leaderboardRoute
 );
-
-
-// =====================================================
-// PASSWORD ROUTES
-// =====================================================
 
 app.use(
     "/password",
@@ -153,16 +161,68 @@ app.use(
 // TEST ROUTE
 // =====================================================
 
-app.get(
-    "/",
-    (req, res) => {
+app.get("/", (req, res) => {
 
-        return res.status(200).json({
+    writeLog(
+        "GET / - Expense API accessed"
+    );
 
-            success: true,
+    return res.status(200).json({
+
+        success: true,
+
+        message:
+            "Expense API is running"
+
+    });
+
+});
+
+
+// =====================================================
+// 404 ROUTE
+// =====================================================
+
+app.use((req, res) => {
+
+    writeLog(
+        `404 - Route not found: ${req.method} ${req.originalUrl}`
+    );
+
+    return res.status(404).json({
+
+        success: false,
+
+        message:
+            "Route not found"
+
+    });
+
+});
+
+
+// =====================================================
+// GLOBAL ERROR HANDLER
+// =====================================================
+
+app.use(
+    (error, req, res, next) => {
+
+        console.error(
+            "Global Error:",
+            error
+        );
+
+        writeLog(
+            `GLOBAL ERROR: ${error.stack || error.message}`
+        );
+
+        return res.status(500).json({
+
+            success: false,
 
             message:
-                "Expense API is running"
+                "Internal server error"
 
         });
 
@@ -179,7 +239,7 @@ async function startServer() {
     try {
 
         // ---------------------------------------------
-        // CHECK DATABASE CONNECTION
+        // DATABASE CONNECTION
         // ---------------------------------------------
 
         await sequelize.authenticate();
@@ -188,9 +248,13 @@ async function startServer() {
             "Database connected successfully ✅"
         );
 
+        writeLog(
+            "Database connected successfully"
+        );
+
 
         // ---------------------------------------------
-        // SYNC DATABASE
+        // DATABASE SYNC
         // ---------------------------------------------
 
         await sequelize.sync({
@@ -201,13 +265,25 @@ async function startServer() {
             "Database tables updated successfully ✅"
         );
 
+        writeLog(
+            "Database tables updated successfully"
+        );
+
+
+        // ---------------------------------------------
+        // PORT
+        // ---------------------------------------------
+
+        const PORT =
+            process.env.PORT || 3001;
+
 
         // ---------------------------------------------
         // START EXPRESS SERVER
         // ---------------------------------------------
 
         app.listen(
-            3001,
+            PORT,
             () => {
 
                 console.log(
@@ -215,21 +291,27 @@ async function startServer() {
                 );
 
                 console.log(
-                    "Server running on port 3001 🚀"
+                    `Server running on port ${PORT} 🚀`
                 );
 
                 console.log(
-                    "http://localhost:3001"
+                    `http://localhost:${PORT}`
                 );
 
                 console.log(
                     "======================================"
                 );
 
+                writeLog(
+                    `Server started successfully on port ${PORT}`
+                );
+
             }
         );
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
         console.log(
             "======================================"
@@ -245,6 +327,11 @@ async function startServer() {
 
         console.log(
             "======================================"
+        );
+
+
+        writeLog(
+            `SERVER START ERROR: ${error.stack || error.message}`
         );
 
     }
