@@ -1,100 +1,250 @@
 const Expense = require("../Expense");
 const User = require("../User");
-const { fn, col, literal } = require("sequelize");
+
+const {
+    fn,
+    col,
+    literal
+} = require("sequelize");
 
 
-// =========================
+// =====================================================
+// GET PREMIUM STATUS
+// =====================================================
+
+const getPremiumStatus = async (req, res) => {
+
+    try {
+
+        // ---------------------------------------------
+        // CHECK LOGGED-IN USER
+        // ---------------------------------------------
+
+        const user = await User.findByPk(
+            req.user.id,
+            {
+                attributes: [
+                    "id",
+                    "name",
+                    "isPremium"
+                ]
+            }
+        );
+
+
+        // ---------------------------------------------
+        // USER NOT FOUND
+        // ---------------------------------------------
+
+        if (!user) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    "User not found",
+
+                isPremium:
+                    false
+
+            });
+
+        }
+
+
+        // ---------------------------------------------
+        // RETURN PREMIUM STATUS
+        // ---------------------------------------------
+
+        return res.status(200).json({
+
+            success: true,
+
+            isPremium:
+                user.isPremium === true
+
+        });
+
+    }
+    catch (error) {
+
+        console.log(
+            "Premium status error:",
+            error
+        );
+
+
+        return res.status(500).json({
+
+            success: false,
+
+            message:
+                "Failed to check premium status",
+
+            isPremium:
+                false
+
+        });
+
+    }
+
+};
+
+
+
+// =====================================================
 // SHOW LEADERBOARD
-// =========================
+// =====================================================
 
 const showLeaderboard = async (req, res) => {
 
     try {
 
-        // Check logged-in user
-        const currentUser = await User.findByPk(req.user.id);
+        // ---------------------------------------------
+        // CHECK LOGGED-IN USER
+        // ---------------------------------------------
+
+        const currentUser =
+            await User.findByPk(
+                req.user.id
+            );
+
 
         if (!currentUser) {
+
             return res.status(404).json({
-                message: "User not found"
+
+                success: false,
+
+                message:
+                    "User not found"
+
             });
+
         }
 
-        // Premium check
-        if (!currentUser.isPremium) {
+
+        // ---------------------------------------------
+        // PREMIUM CHECK
+        // ---------------------------------------------
+
+        if (
+            currentUser.isPremium !== true
+        ) {
 
             return res.status(403).json({
-                message: "Premium membership required to view leaderboard"
+
+                success: false,
+
+                message:
+                    "Premium membership required to view leaderboard"
+
             });
 
         }
 
 
-        // =========================
+        // =================================================
         // GET LEADERBOARD
-        // =========================
+        // =================================================
 
-        const leaderboard = await Expense.findAll({
-
-            attributes: [
-                "userId",
-                [
-                    fn("SUM", col("amount")),
-                    "totalExpense"
-                ]
-            ],
-
-            group: ["userId"],
-
-            order: [
-                [
-                    literal("totalExpense"),
-                    "DESC"
-                ]
-            ],
-
-            raw: true
-
-        });
-
-
-        // =========================
-        // GET USER DETAILS
-        // =========================
-
-        const result = [];
-
-        for (const item of leaderboard) {
-
-            const user = await User.findOne({
-
-                where: {
-                    id: item.userId
-                },
+        const leaderboard =
+            await Expense.findAll({
 
                 attributes: [
-                    "id",
-                    "name",
-                    "isPremium"
+
+                    "userId",
+
+                    [
+                        fn(
+                            "SUM",
+                            col("amount")
+                        ),
+                        "totalExpense"
+                    ]
+
                 ],
+
+
+                group: [
+                    "userId"
+                ],
+
+
+                order: [
+
+                    [
+                        literal(
+                            "totalExpense"
+                        ),
+                        "DESC"
+                    ]
+
+                ],
+
 
                 raw: true
 
             });
 
 
+
+        // =================================================
+        // GET USER DETAILS
+        // =================================================
+
+        const result = [];
+
+
+        for (
+            const item of leaderboard
+        ) {
+
+            const user =
+                await User.findOne({
+
+                    where: {
+
+                        id:
+                            item.userId
+
+                    },
+
+
+                    attributes: [
+
+                        "id",
+
+                        "name",
+
+                        "isPremium"
+
+                    ],
+
+
+                    raw: true
+
+                });
+
+
             if (user) {
 
                 result.push({
 
-                    userId: user.id,
+                    userId:
+                        user.id,
 
-                    name: user.name,
+                    name:
+                        user.name,
 
-                    isPremium: user.isPremium,
+                    isPremium:
+                        user.isPremium,
 
                     totalExpense:
-                        Number(item.totalExpense)
+                        Number(
+                            item.totalExpense
+                        )
 
                 });
 
@@ -103,32 +253,39 @@ const showLeaderboard = async (req, res) => {
         }
 
 
-        // =========================
+
+        // =================================================
         // ADD RANK
-        // =========================
+        // =================================================
 
         const rankedResult =
-            result.map((user, index) => {
+            result.map(
+                (user, index) => {
 
-                return {
+                    return {
 
-                    rank: index + 1,
+                        rank:
+                            index + 1,
 
-                    name: user.name,
+                        name:
+                            user.name,
 
-                    isPremium: user.isPremium,
+                        isPremium:
+                            user.isPremium,
 
-                    totalExpense:
-                        user.totalExpense
+                        totalExpense:
+                            user.totalExpense
 
-                };
+                    };
 
-            });
+                }
+            );
 
 
-        // =========================
+
+        // =================================================
         // RESPONSE
-        // =========================
+        // =================================================
 
         return res.status(200).json({
 
@@ -142,13 +299,14 @@ const showLeaderboard = async (req, res) => {
 
         });
 
-
-    } catch (error) {
+    }
+    catch (error) {
 
         console.log(
             "Leaderboard error:",
             error
         );
+
 
         return res.status(500).json({
 
@@ -167,6 +325,15 @@ const showLeaderboard = async (req, res) => {
 };
 
 
+
+// =====================================================
+// EXPORT CONTROLLERS
+// =====================================================
+
 module.exports = {
+
+    getPremiumStatus,
+
     showLeaderboard
+
 };

@@ -1,7 +1,8 @@
 const express = require("express");
 
 const {
-    showLeaderboard
+    showLeaderboard,
+    getPremiumStatus
 } = require("../controllers/premiumController");
 
 const authenticateToken =
@@ -9,10 +10,29 @@ const authenticateToken =
 
 const router = express.Router();
 
+
+// =====================================================
+// PREMIUM STATUS
+// GET /premium/status
+// =====================================================
+
+router.get(
+    "/status",
+    authenticateToken,
+    getPremiumStatus
+);
+
+
+// =====================================================
+// LEADERBOARD
+// GET /premium/showleaderboard
+// =====================================================
+
 router.get(
     "/showleaderboard",
     authenticateToken,
     showLeaderboard
 );
+
 
 module.exports = router;
