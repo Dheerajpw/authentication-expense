@@ -150,7 +150,6 @@ Rules:
 // =====================================================
 // CREATE EXPENSE
 // POST /expenses
-// TRANSACTION REQUIRED ✅
 // =====================================================
 
 const createExpense = async (req, res) => {
@@ -306,8 +305,10 @@ const createExpense = async (req, res) => {
 
 // =====================================================
 // GET EXPENSES
-// GET /expenses
-// TRANSACTION NOT REQUIRED ❌
+// GET /expenses?page=1
+//
+// PAGINATION:
+// 10 EXPENSES PER PAGE
 // =====================================================
 
 const getExpenses = async (req, res) => {
@@ -318,8 +319,38 @@ const getExpenses = async (req, res) => {
             req.user.id;
 
 
-        const expenses =
-            await Expense.findAll({
+        // =================================================
+        // PAGE NUMBER
+        // =================================================
+
+        const page =
+            Math.max(
+                parseInt(req.query.page) || 1,
+                1
+            );
+
+
+        // =================================================
+        // LIMIT
+        // =================================================
+
+        const limit = 10;
+
+
+        // =================================================
+        // OFFSET
+        // =================================================
+
+        const offset =
+            (page - 1) * limit;
+
+
+        // =================================================
+        // GET PAGINATED EXPENSES
+        // =================================================
+
+        const result =
+            await Expense.findAndCountAll({
 
                 where: {
 
@@ -337,14 +368,67 @@ const getExpenses = async (req, res) => {
 
                     ]
 
-                ]
+                ],
+
+                limit,
+
+                offset
 
             });
 
 
-        return res.status(200).json(
-            expenses
-        );
+        // =================================================
+        // TOTAL EXPENSES
+        // =================================================
+
+        const totalExpenses =
+            result.count;
+
+
+        // =================================================
+        // TOTAL PAGES
+        // =================================================
+
+        const totalPages =
+            Math.ceil(
+                totalExpenses / limit
+            );
+
+
+        // =================================================
+        // RESPONSE
+        // =================================================
+
+        return res.status(200).json({
+
+            success: true,
+
+            expenses:
+                result.rows,
+
+            pagination: {
+
+                currentPage:
+                    page,
+
+                totalPages:
+                    totalPages,
+
+                totalExpenses:
+                    totalExpenses,
+
+                limit:
+                    limit,
+
+                hasNextPage:
+                    page < totalPages,
+
+                hasPreviousPage:
+                    page > 1
+
+            }
+
+        });
 
     }
     catch (error) {
@@ -375,7 +459,6 @@ const getExpenses = async (req, res) => {
 // =====================================================
 // DELETE EXPENSE
 // DELETE /expenses/:id
-// TRANSACTION REQUIRED ✅
 // =====================================================
 
 const deleteExpense = async (req, res) => {
@@ -467,7 +550,9 @@ const deleteExpense = async (req, res) => {
         // NOT FOUND
         // ================================================
 
-        if (error.statusCode === 404) {
+        if (
+            error.statusCode === 404
+        ) {
 
             return res.status(404).json({
 
@@ -505,7 +590,6 @@ const deleteExpense = async (req, res) => {
 // =====================================================
 // UPDATE EXPENSE
 // PUT /expenses/:id
-// TRANSACTION REQUIRED ✅
 // =====================================================
 
 const updateExpense = async (req, res) => {
@@ -647,7 +731,6 @@ const updateExpense = async (req, res) => {
 
                     // =====================================
                     // GET UPDATED EXPENSE
-                    // SAME TRANSACTION
                     // =====================================
 
                     const updatedExpense =
@@ -700,7 +783,9 @@ const updateExpense = async (req, res) => {
         // NOT FOUND
         // ================================================
 
-        if (error.statusCode === 404) {
+        if (
+            error.statusCode === 404
+        ) {
 
             return res.status(404).json({
 
