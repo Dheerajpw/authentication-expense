@@ -1,4 +1,5 @@
 const Expense = require("../Expense");
+const sequelize = require("../db");
 const { GoogleGenAI } = require("@google/genai");
 
 
@@ -37,7 +38,11 @@ const getAICategory = async (description) => {
             return "Other";
         }
 
-        // Agar Gemini API key nahi hai
+
+        // =================================================
+        // GEMINI API KEY CHECK
+        // =================================================
+
         if (!process.env.GEMINI_API_KEY) {
 
             console.log(
@@ -47,6 +52,10 @@ const getAICategory = async (description) => {
             return "Other";
         }
 
+
+        // =================================================
+        // GEMINI PROMPT
+        // =================================================
 
         const prompt = `
 You are an expense categorization AI.
@@ -72,6 +81,10 @@ Rules:
 `;
 
 
+        // =================================================
+        // GEMINI REQUEST
+        // =================================================
+
         const response =
             await ai.models.generateContent({
 
@@ -81,6 +94,10 @@ Rules:
 
             });
 
+
+        // =================================================
+        // GET CATEGORY
+        // =================================================
 
         let category =
             response.text
@@ -94,12 +111,15 @@ Rules:
         );
 
 
-        // Exact allowed category check
+        // =================================================
+        // CHECK ALLOWED CATEGORY
+        // =================================================
+
         const matchedCategory =
             allowedCategories.find(
                 item =>
                     item.toLowerCase() ===
-                    category.toLowerCase()
+                    category?.toLowerCase()
             );
 
 
@@ -111,7 +131,6 @@ Rules:
 
 
         return "Other";
-
 
     }
     catch (error) {
@@ -130,6 +149,8 @@ Rules:
 
 // =====================================================
 // CREATE EXPENSE
+// POST /expenses
+// TRANSACTION REQUIRED ✅
 // =====================================================
 
 const createExpense = async (req, res) => {
@@ -173,7 +194,7 @@ const createExpense = async (req, res) => {
 
 
         // =================================================
-        // GEMINI AI CATEGORY
+        // GEMINI CATEGORY
         // =================================================
 
         const category =
@@ -202,25 +223,49 @@ const createExpense = async (req, res) => {
 
 
         // =================================================
-        // SAVE EXPENSE
+        // DATABASE TRANSACTION
         // =================================================
 
         const expense =
-            await Expense.create({
+            await sequelize.transaction(
+                async (transaction) => {
 
-                userId,
+                    const newExpense =
+                        await Expense.create(
 
-                amount,
+                            {
 
-                description:
-                    description.trim(),
+                                userId,
 
-                category,
+                                amount,
 
-                date
+                                description:
+                                    description.trim(),
 
-            });
+                                category,
 
+                                date
+
+                            },
+
+                            {
+
+                                transaction
+
+                            }
+
+                        );
+
+
+                    return newExpense;
+
+                }
+            );
+
+
+        // =================================================
+        // RESPONSE
+        // =================================================
 
         return res.status(201).json({
 
@@ -232,7 +277,6 @@ const createExpense = async (req, res) => {
             expense
 
         });
-
 
     }
     catch (error) {
@@ -262,6 +306,8 @@ const createExpense = async (req, res) => {
 
 // =====================================================
 // GET EXPENSES
+// GET /expenses
+// TRANSACTION NOT REQUIRED ❌
 // =====================================================
 
 const getExpenses = async (req, res) => {
@@ -276,14 +322,21 @@ const getExpenses = async (req, res) => {
             await Expense.findAll({
 
                 where: {
+
                     userId
+
                 },
 
                 order: [
+
                     [
+
                         "date",
+
                         "DESC"
+
                     ]
+
                 ]
 
             });
@@ -292,7 +345,6 @@ const getExpenses = async (req, res) => {
         return res.status(200).json(
             expenses
         );
-
 
     }
     catch (error) {
@@ -322,6 +374,8 @@ const getExpenses = async (req, res) => {
 
 // =====================================================
 // DELETE EXPENSE
+// DELETE /expenses/:id
+// TRANSACTION REQUIRED ✅
 // =====================================================
 
 const deleteExpense = async (req, res) => {
@@ -337,43 +391,68 @@ const deleteExpense = async (req, res) => {
             req.user.id;
 
 
+        // =================================================
+        // DATABASE TRANSACTION
+        // =================================================
+
         const deleted =
-            await Expense.destroy({
+            await sequelize.transaction(
+                async (transaction) => {
 
-                where: {
+                    const deletedCount =
+                        await Expense.destroy({
 
-                    id,
+                            where: {
 
-                    userId
+                                id,
+
+                                userId
+
+                            },
+
+                            transaction
+
+                        });
+
+
+                    // =====================================
+                    // EXPENSE NOT FOUND
+                    // =====================================
+
+                    if (!deletedCount) {
+
+                        const error =
+                            new Error(
+                                "Expense not found or you are not authorized"
+                            );
+
+                        error.statusCode = 404;
+
+                        throw error;
+
+                    }
+
+
+                    return deletedCount;
 
                 }
+            );
 
-            });
 
-
-        if (!deleted) {
-
-            return res.status(404).json({
-
-                success: false,
-
-                message:
-                    "Expense not found or you are not authorized"
-
-            });
-
-        }
-
+        // =================================================
+        // RESPONSE
+        // =================================================
 
         return res.status(200).json({
 
             success: true,
 
             message:
-                "Expense deleted successfully"
+                "Expense deleted successfully",
+
+            deleted
 
         });
-
 
     }
     catch (error) {
@@ -383,6 +462,28 @@ const deleteExpense = async (req, res) => {
             error
         );
 
+
+        // ================================================
+        // NOT FOUND
+        // ================================================
+
+        if (error.statusCode === 404) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    error.message
+
+            });
+
+        }
+
+
+        // ================================================
+        // SERVER ERROR
+        // ================================================
 
         return res.status(500).json({
 
@@ -403,6 +504,8 @@ const deleteExpense = async (req, res) => {
 
 // =====================================================
 // UPDATE EXPENSE
+// PUT /expenses/:id
+// TRANSACTION REQUIRED ✅
 // =====================================================
 
 const updateExpense = async (req, res) => {
@@ -451,7 +554,7 @@ const updateExpense = async (req, res) => {
 
 
         // =================================================
-        // GEMINI AI CATEGORY
+        // GEMINI CATEGORY
         // =================================================
 
         const category =
@@ -480,71 +583,98 @@ const updateExpense = async (req, res) => {
 
 
         // =================================================
-        // UPDATE EXPENSE
-        // =================================================
-
-        const [updated] =
-            await Expense.update(
-
-                {
-
-                    amount,
-
-                    description:
-                        description.trim(),
-
-                    category,
-
-                    date
-
-                },
-
-                {
-
-                    where: {
-
-                        id,
-
-                        userId
-
-                    }
-
-                }
-
-            );
-
-
-        if (!updated) {
-
-            return res.status(404).json({
-
-                success: false,
-
-                message:
-                    "Expense not found or you are not authorized"
-
-            });
-
-        }
-
-
-        // =================================================
-        // GET UPDATED EXPENSE
+        // DATABASE TRANSACTION
         // =================================================
 
         const expense =
-            await Expense.findOne({
+            await sequelize.transaction(
+                async (transaction) => {
 
-                where: {
+                    // =====================================
+                    // UPDATE
+                    // =====================================
 
-                    id,
+                    const [updated] =
+                        await Expense.update(
 
-                    userId
+                            {
+
+                                amount,
+
+                                description:
+                                    description.trim(),
+
+                                category,
+
+                                date
+
+                            },
+
+                            {
+
+                                where: {
+
+                                    id,
+
+                                    userId
+
+                                },
+
+                                transaction
+
+                            }
+
+                        );
+
+
+                    // =====================================
+                    // EXPENSE NOT FOUND
+                    // =====================================
+
+                    if (!updated) {
+
+                        const error =
+                            new Error(
+                                "Expense not found or you are not authorized"
+                            );
+
+                        error.statusCode = 404;
+
+                        throw error;
+
+                    }
+
+
+                    // =====================================
+                    // GET UPDATED EXPENSE
+                    // SAME TRANSACTION
+                    // =====================================
+
+                    const updatedExpense =
+                        await Expense.findOne({
+
+                            where: {
+
+                                id,
+
+                                userId
+
+                            },
+
+                            transaction
+
+                        });
+
+
+                    return updatedExpense;
 
                 }
+            );
 
-            });
 
+        // =================================================
+        // RESPONSE
+        // =================================================
 
         return res.status(200).json({
 
@@ -557,7 +687,6 @@ const updateExpense = async (req, res) => {
 
         });
 
-
     }
     catch (error) {
 
@@ -566,6 +695,28 @@ const updateExpense = async (req, res) => {
             error
         );
 
+
+        // ================================================
+        // NOT FOUND
+        // ================================================
+
+        if (error.statusCode === 404) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    error.message
+
+            });
+
+        }
+
+
+        // ================================================
+        // SERVER ERROR
+        // ================================================
 
         return res.status(500).json({
 
