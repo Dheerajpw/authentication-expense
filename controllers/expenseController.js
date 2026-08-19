@@ -1,3 +1,4 @@
+
 const Expense = require("../Expense");
 const sequelize = require("../db");
 const { GoogleGenAI } = require("@google/genai");
@@ -305,10 +306,16 @@ const createExpense = async (req, res) => {
 
 // =====================================================
 // GET EXPENSES
-// GET /expenses?page=1
+// GET /expenses?page=1&limit=10
 //
-// PAGINATION:
-// 10 EXPENSES PER PAGE
+// DYNAMIC PAGINATION
+//
+// Allowed limits:
+// 5
+// 10
+// 20
+// 30
+// 40
 // =====================================================
 
 const getExpenses = async (req, res) => {
@@ -320,7 +327,7 @@ const getExpenses = async (req, res) => {
 
 
         // =================================================
-        // PAGE NUMBER
+        // PAGE
         // =================================================
 
         const page =
@@ -334,7 +341,34 @@ const getExpenses = async (req, res) => {
         // LIMIT
         // =================================================
 
-        const limit = 10;
+        let limit =
+            parseInt(req.query.limit) || 10;
+
+
+        // =================================================
+        // ALLOWED LIMITS
+        // =================================================
+
+        const allowedLimits = [
+            5,
+            10,
+            20,
+            30,
+            40
+        ];
+
+
+        // =================================================
+        // INVALID LIMIT
+        // =================================================
+
+        if (
+            !allowedLimits.includes(limit)
+        ) {
+
+            limit = 10;
+
+        }
 
 
         // =================================================
@@ -366,6 +400,14 @@ const getExpenses = async (req, res) => {
 
                         "DESC"
 
+                    ],
+
+                    [
+
+                        "id",
+
+                        "DESC"
+
                     ]
 
                 ],
@@ -393,6 +435,45 @@ const getExpenses = async (req, res) => {
             Math.ceil(
                 totalExpenses / limit
             );
+
+
+        // =================================================
+        // PAGE OUT OF RANGE
+        // =================================================
+
+        if (
+            totalPages > 0 &&
+            page > totalPages
+        ) {
+
+            return res.status(200).json({
+
+                success: true,
+
+                expenses: [],
+
+                pagination: {
+
+                    currentPage:
+                        totalPages,
+
+                    totalPages,
+
+                    totalExpenses,
+
+                    limit,
+
+                    hasNextPage:
+                        false,
+
+                    hasPreviousPage:
+                        totalPages > 1
+
+                }
+
+            });
+
+        }
 
 
         // =================================================
@@ -509,7 +590,8 @@ const deleteExpense = async (req, res) => {
                                 "Expense not found or you are not authorized"
                             );
 
-                        error.statusCode = 404;
+                        error.statusCode =
+                            404;
 
                         throw error;
 
@@ -546,9 +628,9 @@ const deleteExpense = async (req, res) => {
         );
 
 
-        // ================================================
+        // =================================================
         // NOT FOUND
-        // ================================================
+        // =================================================
 
         if (
             error.statusCode === 404
@@ -566,9 +648,9 @@ const deleteExpense = async (req, res) => {
         }
 
 
-        // ================================================
+        // =================================================
         // SERVER ERROR
-        // ================================================
+        // =================================================
 
         return res.status(500).json({
 
@@ -674,6 +756,7 @@ const updateExpense = async (req, res) => {
             await sequelize.transaction(
                 async (transaction) => {
 
+
                     // =====================================
                     // UPDATE
                     // =====================================
@@ -722,7 +805,8 @@ const updateExpense = async (req, res) => {
                                 "Expense not found or you are not authorized"
                             );
 
-                        error.statusCode = 404;
+                        error.statusCode =
+                            404;
 
                         throw error;
 
@@ -779,9 +863,9 @@ const updateExpense = async (req, res) => {
         );
 
 
-        // ================================================
+        // =================================================
         // NOT FOUND
-        // ================================================
+        // =================================================
 
         if (
             error.statusCode === 404
@@ -799,9 +883,9 @@ const updateExpense = async (req, res) => {
         }
 
 
-        // ================================================
+        // =================================================
         // SERVER ERROR
-        // ================================================
+        // =================================================
 
         return res.status(500).json({
 
